@@ -1,0 +1,309 @@
+**************************************************************************
+
+DDSM_README, last updated: August 8, 2000 by Mike Heath
+**************************************************************************
+**************************************************************************
+
+         The Digital Database for Screening Mammography (DDSM)
+                 
+      A collaborative effort between Massachusetts General Hospital, 
+    Sandia National Laboratories, and the University of South Florida 
+               Computer Science and Engineering Department 
+
+**************************************************************************
+
+The database is completed, and contains 2620 cases. This is a mixture of
+normal, benign, benign_without_callback and cancer volumes selected and
+digitized specifically for DDSM. Volumes will be rotated on ftp as they
+become available. 
+
+VOLUMES CURRENTLY ON-LINE: cancer_01
+                           cancer_02
+                           cancer_03
+                           cancer_04
+                           cancer_05
+                           cancer_06
+                           cancer_07
+                           cancer_08
+                           cancer_09
+                           cancer_10
+                           cancer_11
+                           cancer_12
+                           cancer_13
+                           cancer_14
+                           cancer_15
+                           benign_03
+                           benign_04
+                           benign_05
+                           benign_06
+                           benign_07
+                           benign_08
+                           benign_09
+                           benign_10
+                           benign_11
+                           benign_12
+                           benign_13
+                           benign_14
+                           normal_01
+                           normal_02
+                           normal_03
+                           normal_04
+                           normal_05
+                           normal_06
+                           normal_07
+                           normal_08
+                           normal_09
+                           normal_10
+                           normal_11
+                           normal_12
+                           benign_without_callback_01
+                           benign_without_callback_02
+
+Each volume will also be available on an 8mm EXABYTE 160mXL data cartridge. 
+The information is written to the tape using UNIX tar command. 
+
+VOLUMES CURRENTLY AVAILABLE: normal_01
+                             normal_02
+                             normal_03
+                             normal_04
+                             normal_05
+                             normal_06
+                             normal_07
+                             normal_08
+                             normal_09
+                             normal_10
+                             normal_11
+                             normal_12
+                             cancer_01
+                             cancer_02
+                             cancer_03
+                             cancer_04
+                             cancer_05
+                             cancer_06
+                             cancer_07
+                             cancer_08
+                             cancer_09
+                             cancer_10
+                             cancer_11
+                             cancer_12
+                             cancer_13
+                             cancer_14
+                             cancer_15
+                             benign_01
+                             benign_02
+			     benign_03
+			     benign_04
+			     benign_05
+			     benign_06
+			     benign_07
+			     benign_08
+			     benign_09
+			     benign_10
+			     benign_11
+			     benign_12
+			     benign_13
+			     benign_14
+			     benign_without_callback_01
+			     benign_without_callback_02
+
+To order a set of tapes, please send a check of $40.00 for for each tape
+(plus $5 additional per tape for international orders). Print out the
+order form (ftp://figment.csee.usf.edu/pub/DDSM/order_form) and include
+it with your order.
+
+Make check payable in U.S. dollars to:
+
+   UNIVERSITY OF SOUTH FLORIDA
+
+Mail to:
+
+   Mary Parrish  (Email: mparris3@csee.usf.edu)
+   University of South Florida 
+   Department of Computer Science 
+   4202 E. Fowler Ave. 
+   ENB 118 
+   Tampa, FL 33620-5399 
+
+Unfortunately, we are not set up to accept purchase orders or credit cards. 
+The order_form file in this directory is an order form in text format.
+
+Please note that were are not able to provide anything from the database
+on CD-ROM media. We have received many requests for them, but there is
+no way we can do this (even if someone only requests a small portion of
+the 230GB of mammography data). We are working to place much more of the
+volumes on our ftp site to offer an alternative distribution option to
+8mm tapes.
+
+**************************************************************************
+
+The database ftp site directory structure is organized as follows 
+
+
+				DDSM
+		 		  |
+      _____________________________________________________
+     |		 	  |	 	  |      	   |
+
+ DDSM_README		cases		papers		software	
+		 	  |	 	    		   | 
+          ________________________         	     ______________ 
+         |            |           |                 |      |       | 
+
+      cancers      normals     benigns              bin   doc    src
+
+
+DDSM_README:
+
+  Is this file, which contains an overview of the database and latest 
+  information on available volumes of cases. 
+
+cases: 
+
+  Contains a directory for each category of cases. Currently the Categories 
+  cancers, normals and benigns are available:
+  
+  Under each category directory, there is a directory for each volume
+  of cases. Currently the volume normal_04 is available under the normals
+  category. Volumes cancer_01, cancer_02, cancer_03, cancer_04
+  cancer_05, cancer_06, cancer_07 and cancer_08 are available under the cancers 
+  category. Volume benign_05 is available under the benigns category.
+  
+  Under each volume directory, there is a directory for each case. The 
+  number of cases in each volume will vary. The size of data in a volume 
+  is limited by the capacity of a single 8mm tape. There are:
+  - 118 cases in volume normal_01. 
+  - 117 cases in volume normal_02. 
+  -  38 cases in volume normal_03. 
+  -  57 cases in volume normal_04. 
+  -  47 cases in volume normal_05. 
+  -  60 cases in volume normal_06. 
+  -  78 cases in volume normal_07. 
+  -  27 cases in volume normal_08. 
+  -  59 cases in volume normal_09. 
+  -  23 cases in volume normal_10. 
+  -  58 cases in volume normal_11. 
+  -  20 cases in volume normal_12. 
+  -  69 cases in volume cancer_01. 
+  -  88 cases in volume cancer_02. 
+  -  66 cases in volume cancer_03. 
+  -  31 cases in volume cancer_04. 
+  -  83 cases in volume cancer_05. 
+  -  56 cases in volume cancer_06. 
+  -  52 cases in volume cancer_07. 
+  -  60 cases in volume cancer_08. 
+  -  81 cases in volume cancer_09. 
+  -  59 cases in volume cancer_10. 
+  -  59 cases in volume cancer_11. 
+  -  80 cases in volume cancer_12. 
+  -  21 cases in volume cancer_13. 
+  -  42 cases in volume cancer_14. 
+  -  72 cases in volume cancer_15. 
+  -  80 cases in volume benign_01. 
+  -  69 cases in volume benign_02. 
+  -  64 cases in volume benign_03. 
+  -  81 cases in volume benign_04. 
+  -  62 cases in volume benign_05. 
+  -  74 cases in volume benign_06. 
+  -  61 cases in volume benign_07. 
+  -  64 cases in volume benign_08. 
+  -  75 cases in volume benign_09. 
+  -  21 cases in volume benign_10. 
+  -  62 cases in volume benign_11. 
+  -  64 cases in volume benign_12. 
+  -  72 cases in volume benign_13. 
+  -  21 cases in volume benign_14. 
+  -  75 cases in volume benign_without_callback_01.
+  -  66 cases in volume benign_without_callback_02.
+
+
+  Each case directory contains 6 files: a text header file with .ics 
+  extension which contains patient and image information, four jpeg 
+  compressed raw images representing the left and right CC and MLO views, 
+  and a reduced version of the four views concatenated to form a single 
+  16 bits/pixel image in pgm format. In addition each abnormal view has 
+  a text overlay file (ground truth) which describes abnormalities present
+  as marked by an expert radiologist. The actual abnormality location and 
+  boundary in each image are defined by a chain-code.
+  
+  ----USEFUL TIP------------------------------------------------------------
+
+   You can ftp a full case directory by using ncftp (i.e.)
+
+   ncftp figment.csee.usf.edu   (This will log you in as anonymous)
+   cd pub/DDSM/cases/cancers/cancer_03
+   get -R case1000
+  
+   This will create the directory case1000 in your local machines working
+   directory and will copy each file contained in the case into your new
+   directory. Please note this particular volume may not always be on line.
+   
+  --------------------------------------------------------------------------
+
+papers:
+
+  This contains all papers related to DDSM including published papers,
+  progress reports and technical reports. Currently, it contains a 
+  postscript version of the paper:
+
+  The Digital Database for Screening Mammography,
+  K. Bowyer, D. Kopans, W.P. Kegelmeyer, R. Moore, 
+  M. Sallam, K. Chang and K. Woods,
+  In proceedings of the Third International Workshop on Digital Mammography, 
+  Chicago, June 1996.     
+
+software:
+
+  This directory has all software distributed as part of the database. 
+
+  The bin directory currently contains the following executables:
+
+    DDSMView: A utility for viewing ics cases created by Kyong (Jin) Chang,
+              at the Dept. of Computer Science and Engineering, USF.
+   
+    ics2pgm:  A utility for converting an ics case into 4 16 bit/pixel 
+              pgm images created by Kyong (Jin) Chang, at the Dept. of
+              Computer Science and Engineering, USF.
+    
+    jpeg:     The jpeg compression program used by DDSMView and ics2pgm.
+              It was created by Portable Video Research Group (PVRG).
+
+    createTemplate:   
+              This utility converts the overlay file which describes 
+              abnormalities in a view using a chain-code representation
+              into a template in the form of an 8 bit/pixel pgm image. 
+              Pixels in abnormal regions are set to one while the rest of 
+              the image is set to 0.  This utility was created by 
+              Kyong (Jin) Chang, at the Dept. of Computer Science and 
+              Engineering, USF. 
+              
+    compareTemplates:   
+              This utility compares two templates of the form generated
+              by createTemplate. It can be used to compare the results 
+              of a detection algorithm to the ground truth provided with 
+              the images. The utility was created by Kevin Woods, 
+              Dept. of Computer Science and Engineering, USF.      
+
+  DDSMView, ics2pgm and jpeg were compiled on a Sun SPARCstation running 
+  SunOS version 4.1.4 and tested on Sun SPARCstations running 
+  SunOS versions up to 5.5. The remaining utilities were compiled
+  under SunOS version 5.5. 
+
+  THE JPEG UTILITY MUST BE IN THE SAME DIRECTORY IN WHICH DDSMView OR 
+  ics2pgm ARE RUN. 
+   
+  The src directory currently contains source code in C for the ics2pgm 
+  utility to serve as an example of how to read cases in ics format.  
+  It also contains source code for createTemplate and compareTemplates.
+
+  The doc directory contains documentation and pointers to documentations 
+  for available software.  
+
+
+***************************************************************************
+
+Comments or questions can be directed to ddsm@bigpine.csee.usf.edu
+
+Information is also available on
+      http://marathon.csee.usf.edu/Mammography/Database.html 
+
+***************************************************************************
