@@ -5,6 +5,8 @@ Pipeline to extract the data available from the [DDSM project](http://marathon.c
 
 Documentation is thin, but comments in `ddsm_convert.py` should fill in the gaps.
 
+`DDSM_README` is the official readme from the DDSM project.
+
 **download.sh**
 
 Requires the ncftp package to allow for anon ftp logins, compile from source [here](https://www.ncftp.com/download/).
