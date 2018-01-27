@@ -10,6 +10,7 @@ from glob import glob
 import os, sys
 import logging
 import numpy as np
+import pandas as pd
 from pathlib import Path
 import png
 from scipy import ndimage as ndi
@@ -69,16 +70,17 @@ class Abnormality:
 
         for l in abnormality:
             if collect_boundaries:
-                l = l.strip() # strip here so 'not in' behaves correctly
-                if l not in ['BOUNDARY', 'CORE']:
+                if l.strip() not in ['BOUNDARY', 'CORE']:
                     # replace # (chaincode termination signal) with a valid int
                     # and strip() collapses whitespace so we can split
-                    self.boundaries.append(np.array(l.replace('#', '-1').strip().split()).astype(np.int))
+                    candidate = np.array(l.replace('#', '-1').strip().split()).astype(np.int)
+                    if len(candidate):
+                        self.boundaries.append(candidate)
 
             else:
                 fields = l.strip().split(' ')
                 if l.startswith('LESION_TYPE'):
-                    self.lesion_type += l + ' '
+                    self.lesion_type += ' '.join(fields[1:]) + ' '
                 elif l.startswith('ASSESSMENT'):
                     self.assessment = int(fields[1])
                 elif l.startswith('SUBTLETY'):
@@ -90,16 +92,18 @@ class Abnormality:
                     collect_boundaries = True
 
 
-    def generate_segmentations(self, rows, cols):
+    def gen_segs(self, rows, cols, name, scan, output):
         """
         Generates a segmentation (binary numpy array) given the found
-        boundaries.
+        boundaries, and renders it as a 2-bit png.
         """
-        for chain_code in self.boundaries:
-            try:
-                assert len(chain_code) > 0
-            except:
-                raise Exception('malformed chain_code')
+        for i, chain_code in enumerate(self.boundaries):
+
+            filename = os.path.join(output, '{0}.{1}_SEG_{2:03d}.png'.format(name, scan, i+1))
+
+            # don't repeat work
+            if os.path.isfile(filename):
+                return
 
             segmentation = np.zeros((rows, cols))
             # NB: chain code starts w cols, rows (flipped from numpy convention)
@@ -123,19 +127,7 @@ class Abnormality:
 
             self.segmentations.append(segmentation)
             self.proportions.append(proportion)
-
-
-    def render_segmentations(self, name, scan, output):
-        """
-        Renders the segmentations to a 2-bit .png file on disk in the specified
-        output folder.
-        """
-        for i, segmentation in enumerate(self.segmentations):
-            filename = os.path.join(output, '{name}.{scan}_SEG_{n:03d}.png'.format(
-                name=name, scan=scan, n=i+1))
-
-            if not os.path.isfile(filename):
-                png.from_array(segmentation, mode='L').save(filename)
+            png.from_array(segmentation, mode='L').save(filename)
 
 
 class Metadata:
@@ -168,7 +160,7 @@ class Metadata:
 
             # subject ID and corresponding site
             elif l.startswith('filename'):
-                self.name = fields[1]
+                self.name = fields[1].replace('-', '_')
 
                 if self.name.startswith('A'):
                     self.site = 'MGH'
@@ -242,16 +234,18 @@ def run(cmd):
     return(p.returncode, out)
 
 
-def generate_segmentations(subject, output, files, metadata, tempdir='/tmp'):
+def generate_segmentations(subject, output, files, metadata, dataframe, tempdir='/tmp'):
     """
     reads overlay files, and writes out each abnormality into it's own file.
     """
     for scan in list(metadata.scans.keys()):
-        if not metadata.scans[scan]['has_overlay']:
-            continue
+        #if not metadata.scans[scan]['has_overlay']:
+        #    continue
 
         overlay = list(filter(lambda x: scan + '.OVERLAY' in x, files))
-        assert only_one(overlay)
+        if not only_one(overlay):
+            continue
+
         fstem = os.path.splitext(overlay[0])[0]
 
         # grab each abnormality as a blob of text
@@ -262,17 +256,19 @@ def generate_segmentations(subject, output, files, metadata, tempdir='/tmp'):
             # split lines here so Abnormality behaves similarly to Metadata
             abnormality = Abnormality(abnormality_text.splitlines())
 
-            # cheap test to check whether we have segmentation outputs already
-            found_segmentations = glob(os.path.join(output, '{}.*_SEG_*.png'.format(subject)))
+            # render segmentations to disk
+            rows = metadata.scans[scan]['rows']
+            cols = metadata.scans[scan]['cols']
+            abnormality.gen_segs(rows, cols, metadata.name, scan, output)
 
-            if len(abnormality.segmentations) != len(found_segmentations):
-                try:
-                    abnormality.generate_segmentations(
-                        metadata.scans[scan]['rows'], metadata.scans[scan]['cols'])
-                except Exception:
-                    logger.error('subject {} has a malformed boundary, inspect .OVERLAY'.format(subject))
-
-                abnormality.render_segmentations(metadata.name, scan, output)
+            # save metadata to dataframe
+            df.loc[os.path.basename(subject)] = [abnormality.assessment,
+                                                 abnormality.pathology,
+                                                 abnormality.subtlety,
+                                                 abnormality.lesion_type,
+                                                 metadata.age,
+                                                 metadata.site,
+                                                 metadata.density]
 
 
 def convert_scans(subject, output, files, metadata, tempdir='/tmp'):
@@ -322,7 +318,7 @@ def convert_scans(subject, output, files, metadata, tempdir='/tmp'):
         rmtree(working_dir)
 
 
-def main(subject, output, tempdir='/tmp'):
+def main(subject, output, df, tempdir='/tmp'):
 
     files = os.listdir(subject)
     ics_file = list(filter(lambda x: '.ics' in x, files))
@@ -335,17 +331,23 @@ def main(subject, output, tempdir='/tmp'):
     convert_scans(subject, output, files, metadata, tempdir=tempdir)
 
     # generates segmentations from .OVERLAY files (saved as 2-bit .png)
-    generate_segmentations(subject, output, files, metadata, tempdir=tempdir)
+    generate_segmentations(subject, output, files, metadata, df, tempdir=tempdir)
 
 
 if __name__ == "__main__":
     argparser = argparse.ArgumentParser(description=__doc__)
-    argparser.add_argument('subject', help='DDSM subject folder (for an individual)')
-    argparser.add_argument('output', help='directory to place all outputs')
+    argparser.add_argument('subject', help='DDSM subject folder (for an individual), or text tile for batch mode')
+    argparser.add_argument('output', help='folder to place all outputs')
     argparser.add_argument('-t', '--tempdir', help='specify a custom working directory')
     argparser.add_argument('-v', '--verbose', action='count', help='turns on debug messages')
     argparser.add_argument('-l', '--log', help='specify log file')
     args = argparser.parse_args()
+
+    # determine if input is subject folder or batch file
+    if os.path.isfile(args.subject):
+        batch_mode = True
+    else:
+        batch_mode = False
 
     # set logging
     if args.log:
@@ -363,8 +365,29 @@ if __name__ == "__main__":
     else:
         logger.setLevel(logging.INFO)
 
+    # handle temporary directory
     if args.tempdir:
-        main(args.subject, args.output, tempdir=args.tempdir)
+        tempdir = args.tempdir
     else:
-        main(args.subject, args.output)
+        tempdir = '/tmp'
+
+    # metadata file
+    metadata_file = os.path.join(args.output, 'metadata.csv')
+    if os.path.isfile(metadata_file):
+        df = pd.read_csv(metadata_file, index_col=0)
+    else:
+        df = pd.DataFrame(columns=['assessment', 'pathology', 'subtlety', 'lesion_type', 'age', 'site', 'density'])
+        df.index.name = 'id'
+
+    # batch mode or single mode
+    if batch_mode:
+        f = open(args.subject, 'r')
+        subjects = f.readlines()
+
+        for subject in subjects:
+            main(subject.strip(), args.output, df, tempdir)
+    else:
+        main(args.subject, args.output, df, tempdir)
+
+    df.to_csv(metadata_file)
 
