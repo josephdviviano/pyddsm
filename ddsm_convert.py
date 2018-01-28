@@ -153,13 +153,20 @@ class Metadata:
         sequences = []
         collect_sequences = False
 
-        for l in f.readlines():
-            fields = l.strip().split(' ')
+        for l in [line.strip() for line in f.readlines()]:
+
+            # skips empty entries
+            if not l:
+                continue
+
+            fields = l.split(' ') # used later
+
             if collect_sequences:
                 sequences.append(l)
 
             # subject ID and corresponding site
             elif l.startswith('filename'):
+
                 self.name = fields[1].replace('-', '_')
 
                 if self.name.startswith('A'):
@@ -198,7 +205,8 @@ class Metadata:
         # BPP = bits per pixel
         self.scans = {}
         for seq in sequences:
-            seq = seq.strip().split(' ')
+            logger.debug('parsing sequence: {}'.format(seq))
+            seq = seq.split(' ')
             seq_name = seq[0]
 
             self.scans[seq_name] = {}
