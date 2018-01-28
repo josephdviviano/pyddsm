@@ -100,10 +100,10 @@ class Abnormality:
         for i, chain_code in enumerate(self.boundaries):
 
             filename = os.path.join(output, '{0}.{1}_SEG_{2:03d}.png'.format(name, scan, i+1))
-
+            logger.debug('generating segmentation for {}'.format(filename))
             # don't repeat work
             if os.path.isfile(filename):
-                return
+                continue
 
             segmentation = np.zeros((rows, cols))
             # NB: chain code starts w cols, rows (flipped from numpy convention)
@@ -244,6 +244,8 @@ def generate_segmentations(subject, output, files, metadata, dataframe, tempdir=
 
         overlay = list(filter(lambda x: scan + '.OVERLAY' in x, files))
         if not only_one(overlay):
+            logger.debug('found {} overlays for scan {}, skipping'.format(
+                len(overlay), scan))
             continue
 
         fstem = os.path.splitext(overlay[0])[0]
