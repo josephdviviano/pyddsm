@@ -135,7 +135,16 @@ class Metadata:
     The .ics file included for each scan contains crucial information for
     reconstructing the data, and useful metadata about the patient.
 
-    Returns an object with all parameters extracted.
+    Returns an object with the following parameters extracted: name, site, age
+    density, scandate, digitizer, and scans.
+
+    'scans' is a dictionary with the following fields:
+    scans
+        - rows (# of rows)
+        - cols (# of cols)
+        - bpp  (bits per pixel)
+        - res  (resolution)
+        - has_overlay (bool)
     """
     def __init__(self, ics):
         self.name = None
@@ -155,7 +164,7 @@ class Metadata:
 
         for l in [line.strip() for line in f.readlines()]:
 
-            # skips empty entries
+            # skips empty lines
             if not l:
                 continue
 
@@ -221,7 +230,7 @@ class Metadata:
 
 
 def only_one(l):
-    """complains if list l contains more than one element"""
+    """false if list l contains more than one element"""
     if len(l) != 1:
         return(False)
     else:
@@ -294,6 +303,7 @@ def convert_scans(subject, output, files, metadata, tempdir='/tmp'):
 
         # obtain the input data (propriatary .LJPEG format)
         ljpeg = list(filter(lambda x: scan + '.LJPEG' in x, files))
+        print(ljpeg)
         assert only_one(ljpeg)
         fstem = os.path.splitext(ljpeg[0])[0]
 
@@ -329,8 +339,18 @@ def convert_scans(subject, output, files, metadata, tempdir='/tmp'):
 
 
 def main(subject, output, df, tempdir='/tmp'):
+    """
+    Runs metadata extraction, image conversion to 16-bit .png, abnormality
+    extraction, and finally segmentation rendering, in order.
 
+    Ignores all files ending with .1 and ~, as these are unclean files that
+    technically should not be in the DDSM database.
+    """
+
+    logger.debug('starting work on subject {}'.format(subject))
     files = os.listdir(subject)
+    files = list(filter(lambda x: '~' not in x, files)) # edge case
+    files = list(filter(lambda x: not x.endswith('.1'), files)) # edge case
     ics_file = list(filter(lambda x: '.ics' in x, files))
     assert only_one(ics_file)
 
