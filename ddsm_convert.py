@@ -303,7 +303,6 @@ def convert_scans(subject, output, files, metadata, tempdir='/tmp'):
 
         # obtain the input data (propriatary .LJPEG format)
         ljpeg = list(filter(lambda x: scan + '.LJPEG' in x, files))
-        print(ljpeg)
         assert only_one(ljpeg)
         fstem = os.path.splitext(ljpeg[0])[0]
 
