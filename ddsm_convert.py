@@ -107,6 +107,7 @@ class Abnormality:
 
             segmentation = np.zeros((rows, cols))
             # NB: chain code starts w cols, rows (flipped from numpy convention)
+            #     assumes we're using zero-based indexing (hense -1)
             idx = np.array([chain_code[1], chain_code[0]]) # rows, cols
             segmentation[idx[0], idx[1]] = 1
 
@@ -120,7 +121,18 @@ class Abnormality:
                 elif chain_code[c] == 6: idx += [ 0, -1]
                 elif chain_code[c] == 7: idx += [-1, -1]
 
-                segmentation[idx[0], idx[1]] = 1
+                # occasionally, the chain code goes over the edge of the image
+                # should keep an eye on this
+                try:
+                    segmentation[idx[0], idx[1]] = 1
+                except:
+                    logger.debug('edge case in segmentation found, inspect {}'.format(filename))
+                    if idx[0] == rows and idx[1] == cols:
+                        segmentation[rows-1, cols-1] = 1
+                    elif idx[0] >= rows:
+                        segmentation[rows-1, idx[1]] = 1
+                    elif idx[1] >= cols:
+                        segmentation[idx[0], cols-1] = 1
 
             segmentation = ndi.binary_fill_holes(segmentation)
             proportion = (np.sum(segmentation) / (rows*cols)) *100
