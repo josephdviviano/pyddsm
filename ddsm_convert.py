@@ -82,11 +82,20 @@ class Abnormality:
                 if l.startswith('LESION_TYPE'):
                     self.lesion_type += ' '.join(fields[1:]) + ' '
                 elif l.startswith('ASSESSMENT'):
-                    self.assessment = int(fields[1])
+                    try:
+                        self.assessment = int(fields[1])
+                    except IndexError:
+                        self.assessment = -1
                 elif l.startswith('SUBTLETY'):
-                    self.subtlety = int(fields[1])
+                    try:
+                        self.subtlety = int(fields[1])
+                    except IndexError:
+                        self.subtlety = -1
                 elif l.startswith('PATHOLOGY'):
-                    self.pathology = fields[1]
+                    try:
+                        self.pathology = fields[1]
+                    except IndexError:
+                        self.pathology = 'N/A'
                 elif l.startswith('TOTAL_OUTLINES'):
                     self.n_outlines = int(fields[1])
                     collect_boundaries = True
@@ -198,11 +207,20 @@ class Metadata:
                     self.site = 'ISMD'
 
             elif l.startswith('PATIENT_AGE'):
-                self.age = int(fields[1])
+                try:
+                    self.age = int(fields[1])
+                except IndexError:
+                    self.age = -1
             elif l.startswith('DENSITY'):
-                self.density = int(fields[1])
+                try:
+                    self.density = int(fields[1])
+                except IndexError:
+                    self.density = -1
             elif l.startswith('DATE_OF_STUDY'):
-                self.scandate = ' '.join(fields[1:])
+                try:
+                    self.scandate = ' '.join(fields[1:])
+                except IndexError:
+                    self.scandate = 'N/A'
 
             # uses .ics digitizer name and site to find final name
             # this is used by ddsmraw2pnm to normalize grey values to optical
@@ -224,6 +242,7 @@ class Metadata:
 
         # sequences have format NAME,ROWS,COLS,BPP,RES,IS_OVERLAY
         # BPP = bits per pixel
+        # no error handling yet - we assume all sequences are formatted the same
         self.scans = {}
         for seq in sequences:
             logger.debug('parsing sequence: {}'.format(seq))
