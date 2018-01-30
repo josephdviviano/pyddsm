@@ -100,6 +100,12 @@ class Abnormality:
                     self.n_outlines = int(fields[1])
                     collect_boundaries = True
 
+    def __update_segmentation(self, segmentation, rows, cols, idx):
+            """
+            """
+
+            return(segmentation)
+
 
     def gen_segs(self, rows, cols, name, scan, output):
         """
@@ -115,12 +121,10 @@ class Abnormality:
                 continue
 
             segmentation = np.zeros((rows, cols))
-            # NB: chain code starts w cols, rows (flipped from numpy convention)
-            #     assumes we're using zero-based indexing (hense -1)
-            idx = np.array([chain_code[1], chain_code[0]]) # rows, cols
-            segmentation[idx[0], idx[1]] = 1
 
-            for c in range(2, len(chain_code)):
+            # NB: idx = [row, col], chain_code = [col, row]
+            for c in range(1, len(chain_code)):
+                if c == 1: idx = np.array([chain_code[1], chain_code[0]]) # init
                 if   chain_code[c] == 0: idx += [-1,  0]
                 elif chain_code[c] == 1: idx += [-1,  1]
                 elif chain_code[c] == 2: idx += [ 0,  1]
@@ -130,8 +134,10 @@ class Abnormality:
                 elif chain_code[c] == 6: idx += [ 0, -1]
                 elif chain_code[c] == 7: idx += [-1, -1]
 
-                # occasionally, the chain code goes over the edge of the image
-                # should keep an eye on this
+                # Occasionally, the chain code goes over the edge of the image.
+                # in this case we replace that index with the index of the
+                # border. Should keep an eye on this, but in tested cases the
+                # outputs look accurate.
                 try:
                     segmentation[idx[0], idx[1]] = 1
                 except:
@@ -333,7 +339,7 @@ def convert_scans(subject, output, files, metadata, tempdir='/tmp'):
     for scan in list(metadata.scans.keys()):
 
         # obtain the input data (propriatary .LJPEG format)
-        ljpeg = list(filter(lambda x: scan + '.LJPEG' in x, files))
+        ljpeg = list(filter(lambda x: x.endswith(scan + '.LJPEG'), files))
         assert only_one(ljpeg)
         fstem = os.path.splitext(ljpeg[0])[0]
 
@@ -380,7 +386,7 @@ def main(subject, output, df, tempdir='/tmp'):
     logger.debug('starting work on subject {}'.format(subject))
     files = os.listdir(subject)
     files = list(filter(lambda x: '~' not in x, files)) # edge case
-    files = list(filter(lambda x: not x.endswith('.1'), files)) # edge case
+    #files = list(filter(lambda x: not x.endswith('.1'), files)) # edge case
     ics_file = list(filter(lambda x: '.ics' in x, files))
     assert only_one(ics_file)
 
