@@ -100,12 +100,6 @@ class Abnormality:
                     self.n_outlines = int(fields[1])
                     collect_boundaries = True
 
-    def __update_segmentation(self, segmentation, rows, cols, idx):
-            """
-            """
-
-            return(segmentation)
-
 
     def gen_segs(self, rows, cols, name, scan, output):
         """
