@@ -36,7 +36,6 @@ import argparse, os, sys
 from glob import glob
 import logging
 import numpy as np
-import pandas as pd
 from pathlib import Path
 import png
 from scipy import ndimage as ndi
