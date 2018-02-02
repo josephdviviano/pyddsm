@@ -168,7 +168,8 @@ class Abnormality:
                 try:
                     segmentation[idx[0], idx[1]] = 1
                 except:
-                    logger.debug('edge case in segmentation found, inspect {}'.format(filename))
+                    logger.debug('segmentation edge case, inspect {}/{}'.format(
+                        zarr_subj.path, scan))
                     if idx[0] == rows and idx[1] == cols:
                         segmentation[rows-1, cols-1] = 1
                     elif idx[0] >= rows:
