@@ -7,6 +7,43 @@ Documentation is thin, but comments in `ddsm_convert.py` should fill in the gaps
 
 `DDSM_README` is the official readme from the DDSM project.
 
+**output**
+
+Data is output as a `zarr` dataset with the following structure:
+
+```
+root
+  L subj -- attributes = ['age', 'site', 'density', 'pathology']
+      L scan -- attributes = ['rows', 'cols', 'assessment', 'subtlety', 'lesion_type', 'coverage']
+```
+
+Where scan is one of `['LEFT_MLO', 'RIGHT_MLO', 'LEFT_CC', 'RIGHT_CC']`
+
++ assessment = `1:5`
++ subtlety = `1:5`
++ lesion_type = unstructured text
++ coverage = list of percentages detailling coverage of each segmentation over the total image size, one entry per boundary.
+
+To access the a scan for a subject, use:
+
+`root['A_1011_1']['LEFT_MLO'][:, :, 0]`
+
+To access the grooss segmentation for this subject, use:
+
+`root['A_1011_1']['LEFT_MLO'][:, :, 1]`
+
+And finally, any nodules (if found) will be in indicies 2 or beyond:
+
+`root['A_1011_1']['LEFT_MLO'][:, :, 2:]`
+
+To grab a subject-level attribute, use:
+
+`root['A_1011_1'].attrs['age']`
+
+And to grab a scan-level attribute, use:
+
+`root['A_1011_1']['LEFT_MLO'].attrs['assessment']`
+
 **download.sh**
 
 Requires the ncftp package to allow for anon ftp logins, compile from source [here](https://www.ncftp.com/download/).
