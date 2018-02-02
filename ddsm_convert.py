@@ -4,10 +4,36 @@ ddsm_convert.py generates compressed, open-format mamograms and label files at
 their original resolution from the DDSM (Digital Database for Screening
 Mammography) dataset. It expects, for each case, all of the files that can be
 pulled from the official database here: ftp://figment.csee.usf.edu/pub/DDSM/
+
+ZARR STRUCTURE:
+
+root = zarr.open_group('output.zarr', mode='a')
+subj = root.create_group('A_1614_1') # subject
+
+subj.attrs['age']
+subj.attrs['site']
+subj.attrs['density']
+subj.attrs['pathology'] # default healthy
+
+subj[scan].attrs['rows']
+subj[scan].attrs['cols']
+subj[scan].attrs['assessment'] # 1-5
+subj[scan].attrs['subtlety'] # 1-5
+subj[scan].attrs['lesion_type'] # unstructured text
+subj[scan].attrs['coverage'] # list, one entry per boundary
+
+where scan is one of ['LEFT_MLO', 'RIGHT_MLO', 'LEFT_CC', 'RIGHT_CC']
+
+images: [:,:,0] = scan, [:,:,1] = border (broad), [:,:,2:] = nodules (fine)
+NB: not all scans with a border have nodules defined
+
+subj.create_dataset('LEFT_MLO')
+subj.create_dataset('RIGHT_MLO')
+subj.create_dataset('LEFT_CC')
+subj.create_dataset('RIGHT_CC')
 """
-import argparse
+import argparse, os, sys
 from glob import glob
-import os, sys
 import logging
 import numpy as np
 import pandas as pd
@@ -17,6 +43,7 @@ from scipy import ndimage as ndi
 from shutil import copyfile, rmtree
 import subprocess as proc
 import tempfile
+import zarr
 
 # logs to ~/ddsm.log by default
 HOME= str(Path.home())
@@ -62,8 +89,6 @@ class Abnormality:
         self.pathology = None
         self.n_outlines = None
         self.boundaries = [] # list of chain codes
-        self.segmentations = [] # list of numpy arrays
-        self.proportions = [] # list of segmentation coverage (as a %)
 
         # the end of each .OVERLAY file is a set of boundaries
         collect_boundaries = False
@@ -101,18 +126,27 @@ class Abnormality:
                     collect_boundaries = True
 
 
-    def gen_segs(self, rows, cols, name, scan, output):
+    def gen_segs(self, name, scan, zarr_subj):
         """
         Generates a segmentation (binary numpy array) given the found
         boundaries, and renders it as a 2-bit png.
         """
+        image = zarr_subj[scan][:]
+        rows = image.shape[0]
+        cols = image.shape[1]
+
+        # dont repeat work (i.e., dataset already includes the boundaries)
+        if image.shape[-1] == len(self.boundaries)+1:
+            return
+
+        # we append segmentations to this list
+        segmentations = []
+        proportions = []
+
         for i, chain_code in enumerate(self.boundaries):
 
-            filename = os.path.join(output, '{0}.{1}_SEG_{2:03d}.png'.format(name, scan, i+1))
-            logger.debug('generating segmentation for {}'.format(filename))
-            # don't repeat work
-            if os.path.isfile(filename):
-                continue
+            logger.debug('generating segmentation {} for {}/{}'.format(
+                i+1, zarr_subj.path, scan))
 
             segmentation = np.zeros((rows, cols))
 
@@ -146,9 +180,13 @@ class Abnormality:
             segmentation = ndi.binary_fill_holes(segmentation)
             proportion = (np.sum(segmentation) / (rows*cols)) *100
 
-            self.segmentations.append(segmentation)
-            self.proportions.append(proportion)
-            png.from_array(segmentation, mode='L').save(filename)
+            segmentations.append(segmentation)
+            proportions.append(proportion)
+
+        # append segmentations to the image
+        segmentations = np.stack(segmentations, axis=2)
+        zarr_subj[scan].append(segmentations, axis=2)
+        zarr_subj[scan].attrs['coverage'] = proportions
 
 
 class Metadata:
@@ -282,9 +320,11 @@ def run(cmd):
     return(p.returncode, out)
 
 
-def generate_segmentations(subject, output, files, metadata, dataframe, tempdir='/tmp'):
+def generate_segmentations(raw_dir, zarr_subj, files, metadata, tempdir='/tmp'):
     """
-    reads overlay files, and writes out each abnormality into it's own file.
+    reads overlay files, and writes out each abnormality into a numpy array
+    concatenated with it's associated image into the zarr directory structure.
+    Also overwrites any initialized disease-related attributes.
     """
     for scan in list(metadata.scans.keys()):
         #if not metadata.scans[scan]['has_overlay']:
@@ -299,7 +339,7 @@ def generate_segmentations(subject, output, files, metadata, dataframe, tempdir=
         fstem = os.path.splitext(overlay[0])[0]
 
         # grab each abnormality as a blob of text
-        f = open(os.path.join(subject, overlay[0]), 'r').read()
+        f = open(os.path.join(raw_dir, overlay[0]), 'r').read()
         abnormalities = f.split('ABNORMALITY')[1:] # idx 0 is abnormality count
         for abnormality_text in abnormalities:
 
@@ -307,26 +347,26 @@ def generate_segmentations(subject, output, files, metadata, dataframe, tempdir=
             abnormality = Abnormality(abnormality_text.splitlines())
 
             # render segmentations to disk
-            rows = metadata.scans[scan]['rows']
-            cols = metadata.scans[scan]['cols']
-            abnormality.gen_segs(rows, cols, metadata.name, scan, output)
+            abnormality.gen_segs(metadata.name, scan, zarr_subj)
 
-            # save metadata to dataframe
-            df.loc[os.path.basename(subject)] = [abnormality.assessment,
-                                                 abnormality.pathology,
-                                                 abnormality.subtlety,
-                                                 abnormality.lesion_type,
-                                                 metadata.age,
-                                                 metadata.site,
-                                                 metadata.density]
+            # save anbnormality labels
+            zarr_subj.attrs['pathology'] = abnormality.pathology
+            zarr_subj[scan].attrs['assessment'] = abnormality.assessment
+            zarr_subj[scan].attrs['subtlety'] = abnormality.subtlety
+            zarr_subj[scan].attrs['lesion_type'] = abnormality.lesion_type
 
 
-def convert_scans(subject, output, files, metadata, tempdir='/tmp'):
+def convert_scans(raw_dir, zarr_subj, files, metadata, tempdir='/tmp'):
     """
     file conversion pipeline:
       - ljpeg --> RAW: jpeg -d -s {ljpeg_file}" (appends .1 to filename)
       - RAW --> pnm: ddsmraw2pnm
       - pnm --> png: convert -depth 16 {pnm_file} {png_file}
+      - png --> numpy array stored in zarr dataset
+
+    NB: in line with https://arxiv.org/pdf/1703.07047.pdf
+        flip all RIGHT images along horizontal axis so both right and left scans
+        have the same view.
     """
     working_dir_exists = False
 
@@ -338,9 +378,14 @@ def convert_scans(subject, output, files, metadata, tempdir='/tmp'):
         fstem = os.path.splitext(ljpeg[0])[0]
 
         # skip work if we already have the output file
-        png = os.path.join(output, fstem + '.png')
-        if os.path.isfile(png):
+        if scan in list(zarr_subj.array_keys()):
             continue
+
+        # initalize metadata for subject
+        zarr_subj.attrs['age'] = metadata.age
+        zarr_subj.attrs['site'] = metadata.site
+        zarr_subj.attrs['density'] = metadata.density
+        zarr_subj.attrs['pathology'] = "HEALTHY" # overwritten if Abnormality
 
         if not working_dir_exists:
             working_dir = tempfile.mkdtemp(dir=tempdir)
@@ -349,10 +394,11 @@ def convert_scans(subject, output, files, metadata, tempdir='/tmp'):
 
         # have to copy input file because conversion tool does not respond to
         # output path specification
-        ljpeg_raw = os.path.join(subject, ljpeg[0])
+        ljpeg_raw = os.path.join(raw_dir, ljpeg[0])
         ljpeg_tmp = os.path.join(working_dir, ljpeg[0])
         raw = ljpeg_tmp + '.1'
         pnm = raw + '-ddsmraw2pnm.pnm'
+        png_file = os.path.join(working_dir, fstem + '.png')
 
         copyfile(ljpeg_raw, ljpeg_tmp)
 
@@ -362,13 +408,25 @@ def convert_scans(subject, output, files, metadata, tempdir='/tmp'):
             n_rows=metadata.scans[scan]['rows'],
             n_cols=metadata.scans[scan]['cols'],
             digitizer=metadata.digitizer))
-        run('convert -depth 16 {} {}'.format(pnm, png))
+        run('convert -depth 16 {} {}'.format(pnm, png_file))
+        image = np.vstack(png.Reader(png_file).read()[2])
+
+        # all images are flipped to match the orientations of the LEFT view
+        if 'RIGHT' in scan:
+            image = np.fliplr(image)
+
+        # 3rd axis is to allow us to append segmentations
+        rows, cols = image.shape
+        zarr_subj.create_dataset(scan, shape=(rows, cols, 1), mode='w', dtype=image.dtype)
+        zarr_subj[scan][:, :, 0] = image
+        zarr_subj[scan].attrs['rows'] = rows
+        zarr_subj[scan].attrs['cols'] = cols
 
     if working_dir_exists:
         rmtree(working_dir)
 
 
-def main(subject, output, df, tempdir='/tmp'):
+def main(raw_dir, output, tempdir='/tmp'):
     """
     Runs metadata extraction, image conversion to 16-bit .png, abnormality
     extraction, and finally segmentation rendering, in order.
@@ -376,35 +434,41 @@ def main(subject, output, df, tempdir='/tmp'):
     Ignores all files ending with .1 and ~, as these are unclean files that
     technically should not be in the DDSM database.
     """
-
-    logger.debug('starting work on subject {}'.format(subject))
-    files = os.listdir(subject)
+    logger.debug('starting work on folder {}'.format(raw_dir))
+    files = os.listdir(raw_dir)
     files = list(filter(lambda x: '~' not in x, files)) # edge case
-    #files = list(filter(lambda x: not x.endswith('.1'), files)) # edge case
     ics_file = list(filter(lambda x: '.ics' in x, files))
-    assert only_one(ics_file)
+
+    try:
+        assert only_one(ics_file)
+    except:
+        logger.error('more than one .ics file found in {}, please inspect'.format(raw_dir))
+        return
 
     # extracts all metadata from the .ics file
-    metadata = Metadata(os.path.join(subject, ics_file[0]))
+    metadata = Metadata(os.path.join(raw_dir, ics_file[0]))
+
+    # add subject to dataset if it does not exist, otherwise point to it
+    subj = output.require_group(metadata.name)
 
     # converts .LJPEG format to a compressed 16-bit .png
-    convert_scans(subject, output, files, metadata, tempdir=tempdir)
+    convert_scans(raw_dir, subj, files, metadata, tempdir=tempdir)
 
     # generates segmentations from .OVERLAY files (saved as 2-bit .png)
-    generate_segmentations(subject, output, files, metadata, df, tempdir=tempdir)
+    generate_segmentations(raw_dir, subj, files, metadata, tempdir=tempdir)
 
 
 if __name__ == "__main__":
     argparser = argparse.ArgumentParser(description=__doc__)
-    argparser.add_argument('subject', help='DDSM subject folder (for an individual), or text tile for batch mode')
-    argparser.add_argument('output', help='folder to place all outputs')
+    argparser.add_argument('input', help='DDSM subject folder (for an individual), or text tile for batch mode')
+    argparser.add_argument('output', help='output zarr dataset')
     argparser.add_argument('-t', '--tempdir', help='specify a custom working directory')
     argparser.add_argument('-v', '--verbose', action='count', help='turns on debug messages')
     argparser.add_argument('-l', '--log', help='specify log file')
     args = argparser.parse_args()
 
     # determine if input is subject folder or batch file
-    if os.path.isfile(args.subject):
+    if os.path.isfile(args.input):
         batch_mode = True
     else:
         batch_mode = False
@@ -431,23 +495,17 @@ if __name__ == "__main__":
     else:
         tempdir = '/tmp'
 
-    # metadata file
-    metadata_file = os.path.join(args.output, 'metadata.csv')
-    if os.path.isfile(metadata_file):
-        df = pd.read_csv(metadata_file, index_col=0)
-    else:
-        df = pd.DataFrame(columns=['assessment', 'pathology', 'subtlety', 'lesion_type', 'age', 'site', 'density'])
-        df.index.name = 'id'
+    # initialize output, create if does not exist
+    output = zarr.open_group(args.output, mode='a')
 
     # batch mode or single mode
     if batch_mode:
-        f = open(args.subject, 'r')
-        subjects = f.readlines()
+        f = open(args.input, 'r')
+        input_dirs = f.readlines()
 
-        for subject in subjects:
-            main(subject.strip(), args.output, df, tempdir)
+        for input_dir in input_dirs:
+            main(input_dir.strip(), output, tempdir)
     else:
-        main(args.subject, args.output, df, tempdir)
+        main(args.input, output, tempdir)
 
-    df.to_csv(metadata_file)
 
