@@ -180,6 +180,10 @@ class Abnormality:
             segmentation = ndi.binary_fill_holes(segmentation)
             proportion = (np.sum(segmentation) / (rows*cols)) *100
 
+            # all images are flipped to match the orientation of the LEFT view
+            if 'RIGHT' in scan:
+                segmentation = np.fliplr(segmentation)
+
             segmentations.append(segmentation)
             proportions.append(proportion)
 
